@@ -16,7 +16,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import argparse
-import logging
 import sys
 
 import nni
@@ -28,26 +27,16 @@ import torch.optim as optim
 import torchvision
 
 import utils
-import time
+from thop import profile 
 
-# set the logger format
-log_format = "%(asctime)s %(message)s"
-logging.basicConfig(
-    filename="networkmorphism.log",
-    filemode="a",
-    level=logging.INFO,
-    format=log_format,
-    datefmt="%m/%d %I:%M:%S %p",
-)
-# pylint: disable=W0603
-# set the logger format
-logger = logging.getLogger("cifar10-network-morphism-pytorch")
 
 
 def get_args():
     """ get args from command line
     """
     parser = argparse.ArgumentParser("cifar10")
+    parser.add_argument("mode", type=str, help="Enter \"train\" or \"test\". Calculate FLOPs for training one batch or testing one batch.")
+    parser.add_argument("model_json_file", type=str, help="Model file to load in json format.")
     parser.add_argument("--batch_size", type=int, default=128, help="batch size")
     parser.add_argument("--optimizer", type=str, default="SGD", help="optimizer")
     parser.add_argument("--epochs", type=int, default=200, help="epoch limit")
@@ -68,6 +57,7 @@ net = None
 criterion = None
 optimizer = None
 device = "cuda" if torch.cuda.is_available() else "cpu"
+print("device = " + device)
 best_acc = 0.0
 args = get_args()
 
@@ -76,7 +66,6 @@ def build_graph_from_json(ir_model_json):
     """build model from json representation
     """
     graph = json_to_graph(ir_model_json)
-    logging.debug(graph.operation_history)
     model = graph.produce_torch_model()
     return model
 
@@ -91,7 +80,6 @@ def parse_rev_args(receive_msg):
     global optimizer
 
     # Loading Data
-    logger.debug("Preparing data..")
 
     transform_train, transform_test = utils.data_transforms_cifar10(args)
 
@@ -108,12 +96,17 @@ def parse_rev_args(receive_msg):
     testloader = torch.utils.data.DataLoader(
         testset, batch_size=args.batch_size, shuffle=False, num_workers=2
     )
-    print("len(trainset)=" + str(len(trainset)))
-    print("len(testset)=" + str(len(testset)))
 
     # Model
-    logger.debug("Building model..")
     net = build_graph_from_json(receive_msg)
+    thop_input = torch.randn(1, 3, 32, 32)
+    flops, params = profile(net, inputs=(thop_input, ), verbose = False)
+    print("thop_parameters=" + str(params))
+    print("len(trainset)=" + str(len(trainset)))
+    print("len(testset)=" + str(len(testset)))
+    print("FLOPs_per_test=" + str(flops * len(testset)))
+    #exit()
+    print("parameters=" + str(sum(param.numel() for param in net.parameters())))
 
     net = net.to(device)
     criterion = nn.CrossEntropyLoss()
@@ -150,7 +143,6 @@ def train(epoch):
     global criterion
     global optimizer
 
-    logger.debug("Epoch: %d", epoch)
     net.train()
     train_loss = 0
     correct = 0
@@ -170,14 +162,8 @@ def train(epoch):
         correct += predicted.eq(targets).sum().item()
 
         acc = 100.0 * correct / total
+        exit()
 
-        logger.debug(
-            "Loss: %.3f | Acc: %.3f%% (%d/%d)",
-            train_loss / (batch_idx + 1),
-            100.0 * correct / total,
-            correct,
-            total,
-        )
 
     return acc
 
@@ -192,7 +178,6 @@ def test(epoch):
     global criterion
     global optimizer
 
-    logger.debug("Eval on epoch: %d", epoch)
     net.eval()
     test_loss = 0
     correct = 0
@@ -209,14 +194,8 @@ def test(epoch):
             correct += predicted.eq(targets).sum().item()
 
             acc = 100.0 * correct / total
+            exit()
 
-            logger.debug(
-                "Loss: %.3f | Acc: %.3f%% (%d/%d)",
-                test_loss / (batch_idx + 1),
-                100.0 * correct / total,
-                correct,
-                total,
-            )
 
     acc = 100.0 * correct / total
     if acc > best_acc:
@@ -227,28 +206,27 @@ def test(epoch):
 if __name__ == "__main__":
     try:
         # trial get next parameter from network morphism tuner
-        RCV_CONFIG = nni.get_next_parameter()
-        logger.debug(RCV_CONFIG)
+        RCV_CONFIG = ""
+        with open(args.model_json_file) as file_read:
+            RCV_CONFIG = file_read.readline()
 
         parse_rev_args(RCV_CONFIG)
         train_acc = 0.0
         best_acc = 0.0
         early_stop = utils.EarlyStopping(mode="max")
-        start_time = time.time()
-        tmp_ep = 0
         for ep in range(args.epochs):
-            train_acc = train(ep)
-            test_acc, best_acc = test(ep)
+            if args.mode == "train":
+                train_acc = train(ep)
+            else:
+                test_acc, best_acc = test(ep)
+            exit()
             nni.report_intermediate_result(test_acc)
             logger.debug(test_acc)
-            tmp_ep = ep
             if early_stop.step(test_acc):
                 break
-        print("duration=" + str(time.time() - start_time))
-        print("epoch=" + str(tmp_ep))
 
         # trial report best_acc to tuner
         nni.report_final_result(best_acc)
     except Exception as exception:
-        logger.exception(exception)
         raise
+
