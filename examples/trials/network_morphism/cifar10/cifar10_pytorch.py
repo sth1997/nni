@@ -21,6 +21,7 @@ import sys
 
 import nni
 from nni.networkmorphism_tuner.graph import json_to_graph
+from nni.networkmorphism_tuner.bayesian import BayesianOptimizer
 
 import torch
 import torch.nn as nn
@@ -29,6 +30,8 @@ import torchvision
 
 import utils
 import time
+
+import zmq
 
 # set the logger format
 log_format = "%(asctime)s %(message)s"
@@ -223,9 +226,18 @@ def test(epoch):
         best_acc = acc
     return acc, best_acc
 
+def zmq_get_next_parameter(socket):
+    socket.send_pyobj({"type": "get_next_parameter"})
+    message = socket.recv_pyobj()
+    print("bo = " + str(message))
+
 
 if __name__ == "__main__":
     try:
+        context = zmq.Context()
+        socket = context.socket(zmq.REQ)
+        socket.connect("tcp://172.23.33.30:8081")
+        params = zmq_get_next_parameter(socket)
         # trial get next parameter from network morphism tuner
         RCV_CONFIG = nni.get_next_parameter()
         logger.debug(RCV_CONFIG)

@@ -29,6 +29,10 @@ from .common import multi_thread_enabled, multi_phase_enabled
 from .env_vars import dispatcher_env_vars
 from .utils import MetricType
 
+import zmq
+import threading as th
+import sys
+
 _logger = logging.getLogger(__name__)
 
 # Assessor global variables
@@ -83,6 +87,22 @@ class MsgDispatcher(MsgDispatcherBase):
         self.assessor = assessor
         if assessor is None:
             _logger.debug('Assessor is not configured')
+
+        context = zmq.Context()
+        socket = context.socket(zmq.REP)
+        socket.bind("tcp://*:8081")
+        self.zmq_server_thread = th.Thread(target = MsgDispatcher.zmq_server_func, args=(self,))
+        self.zmq_server_thread.start()
+
+    def zmq_server_func(self):
+        while True:
+            try:
+                message = socket.recv_pyobj()
+                if (message["type"] == "get_next_parameter"):
+                    socket.send_pyobj(self.tuner.bo)
+            except Exception as e:
+                print('error:',e)
+                sys.exit()
 
     def load_checkpoint(self):
         self.tuner.load_checkpoint()
