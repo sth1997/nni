@@ -88,6 +88,7 @@ class MsgDispatcher(MsgDispatcherBase):
         self.assessor = assessor
         if assessor is None:
             _logger.debug('Assessor is not configured')
+        self.current_jobs = 0
 
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REP)
@@ -105,6 +106,11 @@ class MsgDispatcher(MsgDispatcherBase):
                     ret["tuner"] = self.tuner
                     self.socket.send_pyobj(ret)
                 elif message["type"] == "generated_parameter":
+                    self.current_jobs += 1
+                    print("New model generated, current jobs = " + str(self.current_jobs))
+                    if not "parameters" in message:
+                        self.socket.send_pyobj("nothing")
+                        continue
                     parameter_id = message["parameter_id"]
                     father_id = message["father_id"]
                     json_params = message["parameters"]
@@ -113,6 +119,7 @@ class MsgDispatcher(MsgDispatcherBase):
                     self.tuner.set_descriptors(model_id, generated_graph)
                     self.tuner.total_data[parameter_id] = (json_params, father_id, model_id)
                     self._trial_params[parameter_id] = json_params
+                    self.socket.send_pyobj("nothing")
             except Exception as e:
                 print('error:',e)
                 sys.exit()
@@ -208,6 +215,8 @@ class MsgDispatcher(MsgDispatcherBase):
     def _handle_final_metric_data(self, data):
         """Call tuner to process final results
         """
+        self.current_jobs -= 1
+        print("Job finished, current jobs = " + str(self.current_jobs))
         id_ = data['parameter_id']
         value = data['value']
         if id_ in _customized_parameter_ids:

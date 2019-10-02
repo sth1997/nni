@@ -2,7 +2,7 @@ authorName: default
 experimentName: example_cifar10-network-morphism-test
 trialConcurrency: 2
 maxExecDuration: 24h
-maxTrialNum: 6
+maxTrialNum: 6000
 #choice: local, remote, pai
 trainingServicePlatform: local
 #searchSpacePath: search_space.json

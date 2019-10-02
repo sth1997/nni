@@ -232,7 +232,7 @@ if __name__ == "__main__":
         socket.connect("tcp://172.23.33.30:8081")
         # trial get next parameter from network morphism tuner
         RCV_CONFIG = nni.get_next_parameter(socket)
-        logger.debug(RCV_CONFIG)
+        logger.info(RCV_CONFIG)
 
         parse_rev_args(RCV_CONFIG)
         train_acc = 0.0

@@ -60,7 +60,7 @@ def get_next_parameter(socket):
     message = socket.recv_pyobj()
     tuner = message["tuner"]
     
-    if self.history:
+    if tuner.history:
         parameter_id = get_sequence_id()
         t1 = time.time()
         json_out, father_id = tuner.generate_parameters(parameter_id)
@@ -68,6 +68,9 @@ def get_next_parameter(socket):
         print("Generated time = " + str(t2 - t1))
         _params['parameters'] = json_out
         socket.send_pyobj({"type": "generated_parameter", "parameters": _params['parameters'], "father_id": father_id, "parameter_id": parameter_id})
+        message = socket.recv_pyobj()
+    else:
+        socket.send_pyobj({"type": "generated_parameter"})
         message = socket.recv_pyobj()
         
     return _params['parameters']
