@@ -88,8 +88,12 @@ class MsgDispatcherBase(Recoverable):
         else:
             self.default_worker.join()
             self.assessor_worker.join()
-
+        
+        self._on_exit()
         _logger.info('Terminated by NNI manager')
+
+    def _on_exit(self):
+        pass
 
     def command_queue_worker(self, command_queue):
         """Process commands in command queues.

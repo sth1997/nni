@@ -29,8 +29,6 @@ from nni.networkmorphism_tuner.nn import CnnGenerator, MlpGenerator
 from nni.networkmorphism_tuner.utils import Constant
 
 from nni.networkmorphism_tuner.graph import graph_to_json, json_to_graph
-import threading as th
-import queue
 
 logger = logging.getLogger("NetworkMorphism_AutoML")
 
@@ -119,45 +117,6 @@ class NetworkMorphismTuner(Tuner):
 
         self.search_space = dict()
 
-        self.future_start()
-
-    def future_start(self):
-        self.future_graph = queue.Queue()
-        self.to_exit = False
-        self.future_p = th.Thread(target=NetworkMorphismTuner.future_func ,args=(self,))
-        self.future_p.start()
-
-    def future_func(self):
-        print("[future] enter")
-        N = 4
-        loop=0
-        while not self.to_exit:
-            if not self.history:
-                #print("[future] not start, sleep")
-                import time
-                time.sleep(5)
-                continue
-            
-            cur_n = len(self.training_queue)  + self.future_graph.qsize()
-            loop += 1
-            if loop >= 60: #print every 5min
-                print(f"[future] cur_n {cur_n}")
-                loop = 0
-            if cur_n < N:
-                res = self.generate()
-                self.future_graph.put(res)
-                print(f"[future] generate {self.future_graph.qsize()}")
-            else:
-                print("[future] sleep")
-                import time
-                time.sleep(5)
-            
-        print("[future] exit")
-
-    def _on_exit(self):
-        self.to_exit = True
-        self.future_p.join()
-
     def update_search_space(self, search_space):
         """
         Update search space definition in tuner by search_space in neural architecture.
@@ -172,22 +131,13 @@ class NetworkMorphismTuner(Tuner):
         ----------
         parameter_id : int
         """
-        import time
-        print(f"nm/generate_parameters {parameter_id}")
         if not self.history:
             self.init_search()
 
         new_father_id = None
         generated_graph = None
         if not self.training_queue:
-            t1 = time.time()
-            try:
-                new_father_id, generated_graph = self.future_graph.get(False)
-            except queue.Empty:
-                print("Future graph queue empty.")
-                new_father_id, generated_graph = self.generate()
-            t2 = time.time()
-            print(f"Time [generate] {t2 - t1}")
+            new_father_id, generated_graph = self.generate()
             new_model_id = self.model_count
             self.model_count += 1
             self.training_queue.append((generated_graph, new_father_id, new_model_id))
@@ -212,7 +162,6 @@ class NetworkMorphismTuner(Tuner):
         value : dict/float
             if value is dict, it should have "default" key.
         """
-        print(f"nm/receive_trial_result {parameter_id}")
         reward = extract_scalar_reward(value)
 
         if parameter_id not in self.total_data:

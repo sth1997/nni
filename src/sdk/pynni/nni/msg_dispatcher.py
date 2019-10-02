@@ -88,21 +88,27 @@ class MsgDispatcher(MsgDispatcherBase):
         if assessor is None:
             _logger.debug('Assessor is not configured')
 
-        context = zmq.Context()
-        socket = context.socket(zmq.REP)
-        socket.bind("tcp://*:8081")
+        self.context = zmq.Context()
+        self.socket = self.context.socket(zmq.REP)
+        self.socket.bind("tcp://0.0.0.0:8081")
         self.zmq_server_thread = th.Thread(target = MsgDispatcher.zmq_server_func, args=(self,))
+        self.zmq_server_thread.setDaemon(True)
         self.zmq_server_thread.start()
 
     def zmq_server_func(self):
         while True:
             try:
-                message = socket.recv_pyobj()
+                message = self.socket.recv_pyobj()
                 if (message["type"] == "get_next_parameter"):
-                    socket.send_pyobj(self.tuner.bo)
+                    self.socket.send_pyobj(self.tuner.bo)
             except Exception as e:
                 print('error:',e)
                 sys.exit()
+
+    def _on_exit(self):
+        print("dispatcher _on_exit")
+        #self.zmq_server_thread.join()
+        self.socket.unbind("tcp://0.0.0.0:8081")
 
     def load_checkpoint(self):
         self.tuner.load_checkpoint()
