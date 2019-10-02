@@ -32,6 +32,7 @@ from .utils import MetricType
 import zmq
 import threading as th
 import sys
+from nni.networkmorphism_tuner.graph import json_to_graph
 
 _logger = logging.getLogger(__name__)
 
@@ -99,8 +100,19 @@ class MsgDispatcher(MsgDispatcherBase):
         while True:
             try:
                 message = self.socket.recv_pyobj()
-                if (message["type"] == "get_next_parameter"):
-                    self.socket.send_pyobj(self.tuner.bo)
+                if message["type"] == "get_next_parameter":
+                    ret = {}
+                    ret["tuner"] = self.tuner
+                    self.socket.send_pyobj(ret)
+                elif message["type"] == "generated_parameter":
+                    parameter_id = message["parameter_id"]
+                    father_id = message["father_id"]
+                    json_params = message["parameters"]
+                    x,y,model_id = total_data[parameter_id]
+                    generated_graph = json_to_graph(json_params)
+                    self.tuner.set_descriptors(model_id, generated_graph)
+                    self.tuner.total_data[parameter_id] = (json_params, father_id, model_id)
+                    self._trial_params[parameter_id] = json_params
             except Exception as e:
                 print('error:',e)
                 sys.exit()
@@ -130,7 +142,7 @@ class MsgDispatcher(MsgDispatcherBase):
         # data: number or trial jobs
         ids = [_create_parameter_id() for _ in range(data)]
         _logger.debug("requesting for generating params of {}".format(ids))
-        params_list = self.tuner.generate_multiple_parameters(ids)
+        params_list = self.tuner.fake_generate_multiple_parameters(ids)
 
         for i, _ in enumerate(params_list):
             send(CommandType.NewTrialJob, _pack_parameter(ids[i], params_list[i]))
@@ -166,6 +178,8 @@ class MsgDispatcher(MsgDispatcherBase):
             if self.assessor is not None:
                 self._handle_intermediate_metric_data(data)
         elif data['type'] == MetricType.REQUEST_PARAMETER:
+            print("REQUEST_PARAMETER is not supported.")
+            exit(1)
             assert multi_phase_enabled()
             assert data['trial_job_id'] is not None
             assert data['parameter_index'] is not None

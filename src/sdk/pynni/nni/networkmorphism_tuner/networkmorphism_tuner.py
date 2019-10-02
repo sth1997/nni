@@ -29,6 +29,7 @@ from nni.networkmorphism_tuner.nn import CnnGenerator, MlpGenerator
 from nni.networkmorphism_tuner.utils import Constant
 
 from nni.networkmorphism_tuner.graph import graph_to_json, json_to_graph
+import time
 
 logger = logging.getLogger("NetworkMorphism_AutoML")
 
@@ -123,25 +124,17 @@ class NetworkMorphismTuner(Tuner):
         """
         self.search_space = search_space
 
-    def generate_parameters(self, parameter_id, **kwargs):
-        """
-        Returns a set of trial neural architecture, as a serializable object.
+    def set_descriptors(self, model_id, generated_graph):
+        self.descriptors[model_id] = generated_graph.extract_descriptor()
 
-        Parameters
-        ----------
-        parameter_id : int
+    def fake_generate_parameters(self, parameter_id, **kwargs):
         """
-        if not self.history:
-            self.init_search()
+        Returns a initialized model.
+        """
+        self.init_search()
 
         new_father_id = None
         generated_graph = None
-        if not self.training_queue:
-            new_father_id, generated_graph = self.generate()
-            new_model_id = self.model_count
-            self.model_count += 1
-            self.training_queue.append((generated_graph, new_father_id, new_model_id))
-            self.descriptors.append(generated_graph.extract_descriptor())
 
         graph, father_id, model_id = self.training_queue.pop(0)
 
@@ -151,6 +144,40 @@ class NetworkMorphismTuner(Tuner):
         self.total_data[parameter_id] = (json_out, father_id, model_id)
 
         return json_out
+
+    def generate_parameters(self, parameter_id, **kwargs):
+        """
+        Returns a set of trial neural architecture, as a serializable object.
+
+        Parameters
+        ----------
+        parameter_id : int
+        """
+        #If there is no history, slave node will use the fake model.
+        if not self.history:
+            #self.init_search()
+            print("If there is no history, generate_parameters should not be called!")
+            exit(1)
+
+        new_father_id = None
+        generated_graph = None
+        if not self.training_queue:
+            new_father_id, generated_graph = self.generate()
+            x,y,new_model_id = total_data[parameter_id]
+            self.training_queue.append((generated_graph, new_father_id, new_model_id))
+            #self.descriptors.append(generated_graph.extract_descriptor())
+        else:
+            print("training_queue should be an empty list.")
+            exit(1)
+
+        graph, father_id, model_id = self.training_queue.pop(0)
+
+        # from graph to json
+        json_model_path = os.path.join(self.path, str(model_id) + ".json")
+        json_out = graph_to_json(graph, json_model_path)
+        #self.total_data[parameter_id] = (json_out, father_id, model_id)
+
+        return json_out, father_id
 
     def receive_trial_result(self, parameter_id, parameters, value, **kwargs):
         """ Record an observation of the objective function.
@@ -177,8 +204,8 @@ class NetworkMorphismTuner(Tuner):
 
     def init_search(self):
         """Call the generators to generate the initial architectures for the search."""
-        if self.verbose:
-            logger.info("Initializing search.")
+        #if self.verbose:
+        #    logger.info("Initializing search.")
         for generator in self.generators:
             graph = generator(self.n_classes, self.input_shape).generate(
                 self.default_model_len, self.default_model_width
@@ -188,8 +215,8 @@ class NetworkMorphismTuner(Tuner):
             self.training_queue.append((graph, -1, model_id))
             self.descriptors.append(graph.extract_descriptor())
 
-        if self.verbose:
-            logger.info("Initialization finished.")
+        #if self.verbose:
+        #    logger.info("Initialization finished.")
 
     def generate(self):
         """Generate the next neural architecture.
@@ -224,8 +251,11 @@ class NetworkMorphismTuner(Tuner):
         model_id: int
         """
         father_id = other_info
+        t1 = time.time()
         self.bo.fit([graph.extract_descriptor()], [metric_value])
         self.bo.add_child(father_id, model_id)
+        t2 = time.time()
+        print("Update time = " + str(t2 - t1))
 
     def add_model(self, metric_value, model_id):
         """ Add model to the history, x_queue and y_queue

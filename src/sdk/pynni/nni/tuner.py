@@ -37,7 +37,7 @@ class Tuner(Recoverable):
         """
         raise NotImplementedError('Tuner: generate_parameters not implemented')
 
-    def generate_multiple_parameters(self, parameter_id_list, **kwargs):
+    def fake_generate_multiple_parameters(self, parameter_id_list, **kwargs):
         """Returns multiple sets of trial (hyper-)parameters, as iterable of serializable objects.
         Call 'generate_parameters()' by 'count' times by default.
         User code must override either this function or 'generate_parameters()'.
@@ -49,7 +49,7 @@ class Tuner(Recoverable):
         for parameter_id in parameter_id_list:
             try:
                 _logger.debug("generating param for {}".format(parameter_id))
-                res = self.generate_parameters(parameter_id, **kwargs)
+                res = self.fake_generate_parameters(parameter_id, **kwargs)
             except nni.NoMoreTrialError:
                 return result
             result.append(res)
