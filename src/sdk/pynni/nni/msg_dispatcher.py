@@ -35,6 +35,7 @@ import sys
 from nni.networkmorphism_tuner.graph import json_to_graph
 
 _logger = logging.getLogger(__name__)
+lock = th.Lock()
 
 # Assessor global variables
 _trial_history = defaultdict(dict)
@@ -67,7 +68,9 @@ def _create_parameter_id():
     return _next_parameter_id - 1
 
 def _pack_parameter(parameter_id, params, customized=False, trial_job_id=None, parameter_index=None):
+    lock.acquire()
     _trial_params[parameter_id] = params
+    lock.release()
     ret = {
         'parameter_id': parameter_id,
         'parameter_source': 'customized' if customized else 'algorithm',
@@ -103,8 +106,10 @@ class MsgDispatcher(MsgDispatcherBase):
                 message = self.socket.recv_pyobj()
                 if message["type"] == "get_next_parameter":
                     ret = {}
+                    lock.acquire()
                     ret["tuner"] = self.tuner
                     self.socket.send_pyobj(ret)
+                    lock.release()
                 elif message["type"] == "generated_parameter":
                     self.current_jobs += 1
                     print("New model generated, current jobs = " + str(self.current_jobs))
@@ -114,11 +119,13 @@ class MsgDispatcher(MsgDispatcherBase):
                     parameter_id = message["parameter_id"]
                     father_id = message["father_id"]
                     json_params = message["parameters"]
+                    lock.acquire()
                     x,y,model_id = self.tuner.total_data[parameter_id]
                     generated_graph = json_to_graph(json_params)
                     self.tuner.set_descriptors(model_id, generated_graph)
                     self.tuner.total_data[parameter_id] = (json_params, father_id, model_id)
                     _trial_params[parameter_id] = json_params
+                    lock.release()
                     self.socket.send_pyobj("nothing")
             except Exception as e:
                 print('error:',e)
@@ -142,14 +149,18 @@ class MsgDispatcher(MsgDispatcherBase):
     def handle_initialize(self, data):
         """Data is search space
         """
+        lock.acquire()
         self.tuner.update_search_space(data)
+        lock.release()
         send(CommandType.Initialized, '')
 
     def handle_request_trial_jobs(self, data):
         # data: number or trial jobs
         ids = [_create_parameter_id() for _ in range(data)]
         _logger.debug("requesting for generating params of {}".format(ids))
+        lock.acquire()
         params_list = self.tuner.fake_generate_multiple_parameters(ids)
+        lock.release()
 
         for i, _ in enumerate(params_list):
             send(CommandType.NewTrialJob, _pack_parameter(ids[i], params_list[i]))
@@ -158,13 +169,17 @@ class MsgDispatcher(MsgDispatcherBase):
             send(CommandType.NoMoreTrialJobs, _pack_parameter(ids[0], ''))
 
     def handle_update_search_space(self, data):
+        lock.acquire()
         self.tuner.update_search_space(data)
+        lock.release()
 
     def handle_import_data(self, data):
         """Import additional data for tuning
         data: a list of dictionarys, each of which has at least two keys, 'parameter' and 'value'
         """
+        lock.acquire()
         self.tuner.import_data(data)
+        lock.release()
 
     def handle_add_customized_trial(self, data):
         # data: parameters
@@ -191,7 +206,9 @@ class MsgDispatcher(MsgDispatcherBase):
             assert data['trial_job_id'] is not None
             assert data['parameter_index'] is not None
             param_id = _create_parameter_id()
+            lock.acquire()
             param = self.tuner.generate_parameters(param_id, trial_job_id=data['trial_job_id'])
+            lock.release()
             send(CommandType.SendTrialJobParameter, _pack_parameter(param_id, param, trial_job_id=data['trial_job_id'], parameter_index=data['parameter_index']))
         else:
             raise ValueError('Data type not supported: {}'.format(data['type']))
@@ -209,8 +226,10 @@ class MsgDispatcher(MsgDispatcherBase):
             _trial_history.pop(trial_job_id)
             if self.assessor is not None:
                 self.assessor.trial_end(trial_job_id, data['event'] == 'SUCCEEDED')
+        lock.acquire()
         if self.tuner is not None:
             self.tuner.trial_end(json_tricks.loads(data['hyper_params'])['parameter_id'], data['event'] == 'SUCCEEDED')
+        lock.release()
 
     def _handle_final_metric_data(self, data):
         """Call tuner to process final results
@@ -219,6 +238,7 @@ class MsgDispatcher(MsgDispatcherBase):
         print("Job finished, current jobs = " + str(self.current_jobs))
         id_ = data['parameter_id']
         value = data['value']
+        lock.acquire()
         if id_ in _customized_parameter_ids:
             if multi_phase_enabled():
                 self.tuner.receive_customized_trial_result(id_, _trial_params[id_], value, trial_job_id=data['trial_job_id'])
@@ -229,6 +249,7 @@ class MsgDispatcher(MsgDispatcherBase):
                 self.tuner.receive_trial_result(id_, _trial_params[id_], value, trial_job_id=data['trial_job_id'])
             else:
                 self.tuner.receive_trial_result(id_, _trial_params[id_], value)
+        lock.release()
 
     def _handle_intermediate_metric_data(self, data):
         """Call assessor to process intermediate results
@@ -265,7 +286,9 @@ class MsgDispatcher(MsgDispatcherBase):
             # notify tuner
             _logger.debug('env var: NNI_INCLUDE_INTERMEDIATE_RESULTS: [%s]', dispatcher_env_vars.NNI_INCLUDE_INTERMEDIATE_RESULTS)
             if dispatcher_env_vars.NNI_INCLUDE_INTERMEDIATE_RESULTS == 'true':
+                lock.acquire()
                 self._earlystop_notify_tuner(data)
+                lock.release()
         else:
             _logger.debug('GOOD')
 
