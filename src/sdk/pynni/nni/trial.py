@@ -61,7 +61,7 @@ def get_next_parameter(socket):
     tuner = message["tuner"]
     
     if tuner.history:
-        parameter_id = get_sequence_id()
+        parameter_id = int(get_sequence_id())
         t1 = time.time()
         json_out, father_id = tuner.generate_parameters(parameter_id)
         t2 = time.time()

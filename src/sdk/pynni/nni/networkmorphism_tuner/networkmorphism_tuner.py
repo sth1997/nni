@@ -163,7 +163,7 @@ class NetworkMorphismTuner(Tuner):
         generated_graph = None
         if not self.training_queue:
             new_father_id, generated_graph = self.generate()
-            x,y,new_model_id = total_data[parameter_id]
+            x,y,new_model_id = self.total_data[parameter_id]
             self.training_queue.append((generated_graph, new_father_id, new_model_id))
             #self.descriptors.append(generated_graph.extract_descriptor())
         else:

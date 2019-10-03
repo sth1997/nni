@@ -114,11 +114,11 @@ class MsgDispatcher(MsgDispatcherBase):
                     parameter_id = message["parameter_id"]
                     father_id = message["father_id"]
                     json_params = message["parameters"]
-                    x,y,model_id = total_data[parameter_id]
+                    x,y,model_id = self.tuner.total_data[parameter_id]
                     generated_graph = json_to_graph(json_params)
                     self.tuner.set_descriptors(model_id, generated_graph)
                     self.tuner.total_data[parameter_id] = (json_params, father_id, model_id)
-                    self._trial_params[parameter_id] = json_params
+                    _trial_params[parameter_id] = json_params
                     self.socket.send_pyobj("nothing")
             except Exception as e:
                 print('error:',e)
