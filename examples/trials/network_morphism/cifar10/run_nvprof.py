@@ -101,9 +101,8 @@ if __name__ == "__main__":
                 json_net = json_file.readline()
                 pytorch_net = build_graph_from_json(json_net)
                 id_parameters_dict[id] = sum(param.numel() for param in pytorch_net.parameters())
-            continue
 
-            '''if (not id in id_epoch_dict) or (id_epoch_dict[id] == 0):
+            if (not id in id_epoch_dict) or (id_epoch_dict[id] == 0):
                 continue
             print(model_json_file_name + "  begin")
             epoch = id_epoch_dict[id]
@@ -121,7 +120,6 @@ if __name__ == "__main__":
             result_file.flush()
             calc_trials += 1
             id_flops_dict[id] = (train_FLOPs + test_FLOPs) / id_duration_dict[id]
-			'''
 				
         
     result_file.write("Number of trials with FLOPs = " + str(calc_trials) + "\n")
@@ -130,19 +128,19 @@ if __name__ == "__main__":
     result_file.close()
 
     experiment_name = args.experiment_path.strip("/").split("/")[-1]
-    #duration_file =  open(experiment_name + "_duration.csv", "w")
-    #flops_file = open(experiment_name + "_FLOPS.csv", "w")
+    duration_file =  open(experiment_name + "_duration.csv", "w")
+    flops_file = open(experiment_name + "_FLOPS.csv", "w")
     parameters_file = open(experiment_name + "_parameters.csv", "w")
     for i in range(total_trials):
         parameters_file.write(str(id_parameters_dict[i]) + ",")
-        '''if id_duration_dict[i] >= 0:
+        if id_duration_dict[i] >= 0:
             duration_file.write(str(id_duration_dict[i]) + ",")
             flops_file.write(str(id_flops_dict[i]) + ",")
         else:
             duration_file.write(",")
             flops_file.write(",")
     duration_file.close()
-    flops_file.close()'''
+    flops_file.close()
     parameters_file.close()
 	
 
