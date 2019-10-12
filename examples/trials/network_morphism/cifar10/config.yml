@@ -24,6 +24,6 @@ tuner:
     #number of classes
     n_output_node: 10
 trial:
-  command: CUDA_VISIBLE_DEVICES=0 srun -N 1 python3 cifar10_pytorch.py
+  command: CUDA_VISIBLE_DEVICES=0 srun -n 1 --ntasks-per-node=1 python3 cifar10_pytorch.py -j 2
   codeDir: .
   gpuNum: 0
