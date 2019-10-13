@@ -15,7 +15,7 @@ class DistModule(TorchModel):
 
 def average_gradients(model):
     """ average gradients """
-    for param in model.parameters():
+    for param in model.module.parameters():
         if param.requires_grad:
             dist.all_reduce(param.grad.data)
 

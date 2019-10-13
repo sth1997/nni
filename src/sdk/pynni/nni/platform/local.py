@@ -28,25 +28,28 @@ import json_tricks
 from ..common import init_logger
 from ..env_vars import trial_env_vars
 
-_sysdir = trial_env_vars.NNI_SYS_DIR
-if not os.path.exists(os.path.join(_sysdir, '.nni')):
-    os.makedirs(os.path.join(_sysdir, '.nni'))
-_metric_file = open(os.path.join(_sysdir, '.nni', 'metrics'), 'wb')
+def init_local():
+    global _sysdir, _metric_file, _nni_platform, _multiphase, _param_index
+    _sysdir = trial_env_vars.NNI_SYS_DIR
+    if not os.path.exists(os.path.join(_sysdir, '.nni')):
+        os.makedirs(os.path.join(_sysdir, '.nni'))
+    _metric_file = open(os.path.join(_sysdir, '.nni', 'metrics'), 'wb')
 
-_outputdir = trial_env_vars.NNI_OUTPUT_DIR
-if not os.path.exists(_outputdir):
-    os.makedirs(_outputdir)
+    _outputdir = trial_env_vars.NNI_OUTPUT_DIR
+    if not os.path.exists(_outputdir):
+        os.makedirs(_outputdir)
 
-_nni_platform = trial_env_vars.NNI_PLATFORM
-if _nni_platform == 'local':
-   _log_file_path = os.path.join(_outputdir, 'trial.log')
-   init_logger(_log_file_path)
+    _nni_platform = trial_env_vars.NNI_PLATFORM
+    if _nni_platform == 'local':
+        _log_file_path = os.path.join(_outputdir, 'trial.log')
+        init_logger(_log_file_path)
 
-_multiphase = trial_env_vars.MULTI_PHASE
+    _multiphase = trial_env_vars.MULTI_PHASE
 
-_param_index = 0
+    _param_index = 0
 
 def request_next_parameter():
+    global _param_index
     metric = json_tricks.dumps({
         'trial_job_id': trial_env_vars.NNI_TRIAL_JOB_ID,
         'type': 'REQUEST_PARAMETER',
@@ -56,7 +59,7 @@ def request_next_parameter():
     send_metric(metric)
 
 def get_next_parameter():
-    global _param_index
+    global _param_index, _multiphase
     params_file_name = ''
     if _multiphase and (_multiphase == 'true' or _multiphase == 'True'):
         params_file_name = ('parameter_{}.cfg'.format(_param_index), 'parameter.cfg')[_param_index == 0]
@@ -68,6 +71,7 @@ def get_next_parameter():
         else:
             raise AssertionError('_param_index value ({}) should >=0'.format(_param_index))
 
+    global _sysdir
     params_filepath = os.path.join(_sysdir, params_file_name)
     if not os.path.isfile(params_filepath):
         request_next_parameter()
@@ -79,6 +83,7 @@ def get_next_parameter():
     return params
 
 def send_metric(string):
+    global _nni_platform
     if _nni_platform != 'local':
         data = (string).encode('utf8')
         assert len(data) < 1000000, 'Metric too long'
@@ -86,6 +91,7 @@ def send_metric(string):
     else:
         data = (string + '\n').encode('utf8')
         assert len(data) < 1000000, 'Metric too long'
+        global _metric_file
         _metric_file.write(b'ME%06d%b' % (len(data), data))
         _metric_file.flush()
         if sys.platform == "win32":

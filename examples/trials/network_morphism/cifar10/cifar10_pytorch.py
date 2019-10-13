@@ -105,7 +105,7 @@ def parse_rev_args(receive_msg):
     testsampler = DistributedSampler(testset)
 
     testloader = torch.utils.data.DataLoader(
-        testset, batch_size=args.batch_size_per_gpu, shuffle=False, num_workers=args.workers,
+        testset, batch_size=args.batch_size_per_gpu, shuffle=False, num_workers=0,
         pin_memory=False, sampler=testsampler
     )
     if rank == 0:
@@ -182,22 +182,28 @@ def train(epoch):
         total += targets.size(0)
         correct += predicted.eq(targets).sum().item()
 
-        reduced_total = total
-        reduced_correct = correct
-        dist.all_reduce_multigpu([reduced_total])
-        dist.all_reduce_multigpu([reduced_correct])
-        print("reduced total = " + str(reduced_total) + "  correct = " + str(reduced_correct))
-
-        acc = 100.0 * reduced_correct / reduced_total
-
+        #As the cost of all_reduce, we don't use all_reduce every batch to calculate acc."
+        """
         if rank == 0:
             logger.debug(
                 "Loss: %.3f | Acc: %.3f%% (%d/%d)",
                 train_loss / (batch_idx + 1),
-                100.0 * reduced_correct / reduced_total,
-                reduced_correct,
-                reduced_total,
+                100.0 * tmp_correct / tmp_total,
+                tmp_correct,
+                tmp_total,
             )
+        """
+
+    reduced_total = torch.Tensor([total])
+    reduced_correct = torch.Tensor([correct])
+    reduced_total = reduced_total.cuda()
+    reduced_correct = reduced_correct.cuda()
+    dist.all_reduce(reduced_total)
+    dist.all_reduce(reduced_correct)
+
+    tmp_total = int(reduced_total[0])
+    tmp_correct = int(reduced_correct[0])
+    acc = 100.0 * tmp_correct / tmp_total
 
     return acc
 
@@ -220,46 +226,49 @@ def test(epoch):
     total = 0
     with torch.no_grad():
         for batch_idx, (inputs, targets) in enumerate(testloader):
-            targets = targets.cuda(async=True)
+            #targets = targets.cuda(async=True)
             #inputs, targets = inputs.to(device), targets.to(device)
-            input_var = torch.autograd.Variable(inputs.cuda(), volatile=True)
-            target_var = torch.autograd.Variable(targets, volatile=True)
-            outputs = net(input_var)
-            loss = criterion(outputs, target_var) / world_size
+            inputs, targets = inputs.cuda(), targets.cuda()
+            #input_var = torch.autograd.Variable(inputs.cuda(), volatile=True)
+            #target_var = torch.autograd.Variable(targets, volatile=True)
+            #outputs = net(input_var)
+            outputs = net(inputs)
+            loss = criterion(outputs, targets) / world_size
 
             test_loss += loss.item()
             _, predicted = outputs.data.max(1)
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
 
-            acc = 100.0 * correct / total
-            
+            #As the cost of all_reduce, we don't use all_reduce every batch to calculate acc."
+            """
             if rank == 0:
                 logger.debug(
                     "Loss: %.3f | Acc: %.3f%% (%d/%d)",
                     test_loss / (batch_idx + 1),
-                    100.0 * correct / total,
-                    correct,
-                    total,
-                )
+                    100.0 * tmp_correct / tmp_total,
+                    tmp_correct,
+                    tmp_total,
+                )"""
 
-    acc = 100.0 * correct / total
+    reduced_total = torch.Tensor([total])
+    reduced_correct = torch.Tensor([correct])
+    reduced_total = reduced_total.cuda()
+    reduced_correct = reduced_correct.cuda()
+    dist.all_reduce(reduced_total)
+    dist.all_reduce(reduced_correct)
+
+    tmp_total = int(reduced_total[0])
+    tmp_correct = int(reduced_correct[0])
+    acc = 100.0 * tmp_correct / tmp_total
     if acc > best_acc:
         best_acc = acc
     return acc, best_acc
 
 if __name__ == "__main__":
-    # set the logger format
-    log_format = "%(asctime)s %(message)s"
-    logging.basicConfig(
-        filename="networkmorphism.log",
-        filemode="a",
-        level=logging.INFO,
-        format=log_format,
-        datefmt="%m/%d %I:%M:%S %p",
-    )
     # pylint: disable=W0603
     # set the logger format
+    nni.init_trial()
     global logger
     logger = None
 
@@ -269,6 +278,15 @@ if __name__ == "__main__":
     global rank, world_size
     rank, world_size = dist_init(args.port)
     if rank == 0:
+        # set the logger format
+        log_format = "%(asctime)s %(message)s"
+        logging.basicConfig(
+            filename="networkmorphism.log",
+            filemode="a",
+            level=logging.INFO,
+            format=log_format,
+            datefmt="%m/%d %I:%M:%S %p",
+        )
         logger = logging.getLogger("cifar10-network-morphism-pytorch")
 
     global trainloader, testloader, trainsampler, testsampler, net, criterion, optimizer, best_acc
