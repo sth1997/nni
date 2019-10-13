@@ -114,16 +114,19 @@ def report_intermediate_result(metric):
     platform.send_metric(metric)
 
 
-def report_final_result(metric):
+def report_final_result(metric, socket):
     """Reports final result to tuner.
     metric: serializable object.
     """
     assert _params is not None, 'nni.get_next_parameter() needs to be called before report_final_result'
-    metric = json_tricks.dumps({
+    metric_dict = {
         'parameter_id': _params['parameter_id'],
         'trial_job_id': trial_env_vars.NNI_TRIAL_JOB_ID,
         'type': 'FINAL',
         'sequence': 0,  # TODO: may be unnecessary
         'value': metric
-    })
+    }
+    metric = json_tricks.dumps(metric_dict)
     platform.send_metric(metric)
+    socket.send_pyobj(metric_dict)
+    message = socket.recv_pyobj()

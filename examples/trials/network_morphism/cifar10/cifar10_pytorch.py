@@ -313,7 +313,7 @@ if __name__ == "__main__":
             RCV_CONFIG = nni.get_next_parameter(socket)
             with open(real_model_file, "w") as f:
                 json.dump(RCV_CONFIG, f)
-            logger.info(RCV_CONFIG)
+            #logger.info(RCV_CONFIG)
         else:
             while not os.path.isfile(real_model_file):
                 time.sleep(5)
@@ -338,11 +338,11 @@ if __name__ == "__main__":
                 break
         if rank == 0:
             print("duration=" + str(time.time() - start_time))
-            print("epoch=" + str(tmp_ep))
+            print("epoch=" + str(tmp_ep + 1))
             print("best_acc=" + str(best_acc))
 
             # trial report best_acc to tuner
-            nni.report_final_result(best_acc)
+            nni.report_final_result(best_acc, socket)
         dist.barrier()
     except Exception as exception:
         logger.exception(exception)

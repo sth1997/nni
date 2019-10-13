@@ -127,6 +127,10 @@ class MsgDispatcher(MsgDispatcherBase):
                     _trial_params[parameter_id] = json_params
                     lock.release()
                     self.socket.send_pyobj("nothing")
+                elif message["type"] == "FINAL":
+                    self.socket.send_pyobj("nothing")
+                    self._handle_final_metric_data(message)
+                    
             except Exception as e:
                 print('error:',e)
                 sys.exit()
@@ -226,16 +230,18 @@ class MsgDispatcher(MsgDispatcherBase):
             _trial_history.pop(trial_job_id)
             if self.assessor is not None:
                 self.assessor.trial_end(trial_job_id, data['event'] == 'SUCCEEDED')
-        lock.acquire()
-        if self.tuner is not None:
-            self.tuner.trial_end(json_tricks.loads(data['hyper_params'])['parameter_id'], data['event'] == 'SUCCEEDED')
-        lock.release()
+        #lock.acquire()
+        #Comment out these two lines because the function do nothing.
+        #if self.tuner is not None:
+        #    self.tuner.trial_end(json_tricks.loads(data['hyper_params'])['parameter_id'], data['event'] == 'SUCCEEDED')
+        #lock.release()
 
     def _handle_final_metric_data(self, data):
         """Call tuner to process final results
         """
         self.current_jobs -= 1
         print("Job finished, current jobs = " + str(self.current_jobs))
+        print("parameter_id = " + str(data['parameter_id']) + "  trial_job_id = " + str(data['trial_job_id']) + "  value = " + str(data['value']))
         id_ = data['parameter_id']
         value = data['value']
         lock.acquire()
@@ -250,6 +256,7 @@ class MsgDispatcher(MsgDispatcherBase):
             else:
                 self.tuner.receive_trial_result(id_, _trial_params[id_], value)
         lock.release()
+        self.handle_trial_end(data)
 
     def _handle_intermediate_metric_data(self, data):
         """Call assessor to process intermediate results
