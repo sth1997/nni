@@ -84,10 +84,16 @@ class NetworkMorphismTuner(Tuner):
         default_model_width : int
             default model width (default: {Constant.MODEL_WIDTH})
         """
-
-        if not os.path.exists(path):
-            os.makedirs(path)
-        self.path = os.path.join(os.getcwd(), path)
+        
+        #Change model path to mount file
+        #cwd is like /root/nni/experiments/f0MDbwOp/log
+        #path is model_path
+        exp_id = os.getcwd().split("/")[-2]
+        logPath = os.environ["HOME"] + "/mountdir/nni/experiments/" + exp_id + "/log"
+        self.path = os.path.join(logPath, path)
+        logger.info("self.path = " + self.path)
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
         if task == "cv":
             self.generators = [CnnGenerator]
         elif task == "common":
