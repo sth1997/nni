@@ -98,15 +98,16 @@ def parse_rev_args(receive_msg):
 
     transform_train, transform_test = utils.data_transforms_cifar10(args)
 
+    dataPath = os.environ["HOME"] + "/mountdir/data/"
     trainset = torchvision.datasets.CIFAR10(
-        root="./data", train=True, download=True, transform=transform_train
+        root=dataPath, train=True, download=True, transform=transform_train
     )
     trainloader = torch.utils.data.DataLoader(
         trainset, batch_size=args.batch_size, shuffle=True, num_workers=2
     )
 
     testset = torchvision.datasets.CIFAR10(
-        root="./data", train=False, download=True, transform=transform_test
+        root=dataPath, train=False, download=True, transform=transform_test
     )
     testloader = torch.utils.data.DataLoader(
         testset, batch_size=args.batch_size, shuffle=False, num_workers=2
