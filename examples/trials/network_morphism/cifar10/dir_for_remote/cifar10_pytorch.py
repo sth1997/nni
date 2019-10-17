@@ -31,6 +31,7 @@ import utils
 import time
 
 import zmq
+import os
 
 # set the logger format
 log_format = "%(asctime)s %(message)s"
@@ -229,7 +230,7 @@ if __name__ == "__main__":
     try:
         context = zmq.Context()
         socket = context.socket(zmq.REQ)
-        socket.connect("tcp://172.23.33.30:8081")
+        socket.connect("tcp://172.23.33.30:800081")
         # trial get next parameter from network morphism tuner
         RCV_CONFIG = nni.get_next_parameter(socket)
         logger.info(RCV_CONFIG)
@@ -248,9 +249,14 @@ if __name__ == "__main__":
             tmp_ep = ep
             if early_stop.step(test_acc):
                 break
+        tmp_ep += 1
+        os.makedirs(os.environ["HOME"] + "/nni/experiments/" + str(nni.get_experiment_id()) + "/trials" + str(nni.get_trial_id()))
+        f = open(os.environ["HOME"] + "/nni/experiments/" + str(nni.get_experiment_id()) + "/trials/" + str(nni.get_trial_id()) + "/output.log", "w")
         print("duration=" + str(time.time() - start_time))
         print("epoch=" + str(tmp_ep))
-
+        f.write("duration=" + str(time.time() - start_time) + "\n")
+        f.write("epoch=" + str(tmp_ep) + "\n")
+        f.close()
         # trial report best_acc to tuner
         nni.report_final_result(best_acc)
     except Exception as exception:

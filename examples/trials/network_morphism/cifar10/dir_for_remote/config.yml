@@ -1,10 +1,11 @@
 authorName: default
 experimentName: example_cifar10-network-morphism-test
-trialConcurrency: 4
+trialConcurrency: 2
 maxExecDuration: 24h
 maxTrialNum: 6000
 #choice: local, remote, pai
-trainingServicePlatform: local
+trainingServicePlatform: remote
+nniManagerIp: 172.23.33.30
 #searchSpacePath: search_space.json
 #choice: true, false
 useAnnotation: false
@@ -24,6 +25,13 @@ tuner:
     #number of classes
     n_output_node: 10
 trial:
-  command: CUDA_VISIBLE_DEVICES=0 srun -N 1 python3 cifar10_pytorch.py
+  command: python3 cifar10_pytorch.py
   codeDir: .
-  gpuNum: 0
+  gpuNum: 1
+machineList:
+  - ip: 172.23.33.35
+    username: sth
+    passwd: sth123
+  - ip: 172.23.33.36
+    username: sth
+    passwd: sth123

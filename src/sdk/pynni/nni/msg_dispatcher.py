@@ -95,7 +95,7 @@ class MsgDispatcher(MsgDispatcherBase):
 
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REP)
-        self.socket.bind("tcp://0.0.0.0:8081")
+        self.socket.bind("tcp://0.0.0.0:800081")
         self.zmq_server_thread = th.Thread(target = MsgDispatcher.zmq_server_func, args=(self,))
         self.zmq_server_thread.setDaemon(True)
         self.zmq_server_thread.start()
