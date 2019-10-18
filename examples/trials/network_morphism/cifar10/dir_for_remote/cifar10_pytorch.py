@@ -255,9 +255,11 @@ if __name__ == "__main__":
         f = open(os.environ["HOME"] + "/mountdir/nni/experiments/" + str(nni.get_experiment_id()) + "/trials/" + str(nni.get_trial_id()) + "/output.log", "w")
         print("duration=" + str(time.time() - start_time))
         print("epoch=" + str(tmp_ep))
+        print("best_acc=" + str(best_acc))
         f.write("sequence_id=" + str(nni.get_sequence_id()) + "\n")
         f.write("duration=" + str(time.time() - start_time) + "\n")
         f.write("epoch=" + str(tmp_ep) + "\n")
+        f.write("best_acc=" + str(best_acc) + "\n")
         f.close()
         # trial report best_acc to tuner
         nni.report_final_result(best_acc)
