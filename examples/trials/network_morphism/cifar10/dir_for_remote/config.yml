@@ -5,7 +5,7 @@ maxExecDuration: 24h
 maxTrialNum: 6000
 #choice: local, remote, pai
 trainingServicePlatform: remote
-nniManagerIp: 172.23.33.30
+nniManagerIp: 172.23.33.35
 #searchSpacePath: search_space.json
 #choice: true, false
 useAnnotation: false
@@ -30,8 +30,10 @@ trial:
   gpuNum: 1
 machineList:
   - ip: 172.23.33.35
-    username: sth
-    passwd: sth123
+    port: 2222
+    username: root
+    passwd: sth
   - ip: 172.23.33.36
-    username: sth
-    passwd: sth123
+    port: 2222
+    username: root
+    passwd: sth

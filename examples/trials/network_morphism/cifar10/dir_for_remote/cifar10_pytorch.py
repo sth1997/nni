@@ -98,15 +98,16 @@ def parse_rev_args(receive_msg):
 
     transform_train, transform_test = utils.data_transforms_cifar10(args)
 
+    dataPath = os.environ["HOME"] + "/mountdir/data/"
     trainset = torchvision.datasets.CIFAR10(
-        root="./data", train=True, download=True, transform=transform_train
+        root=dataPath, train=True, download=True, transform=transform_train
     )
     trainloader = torch.utils.data.DataLoader(
         trainset, batch_size=args.batch_size, shuffle=True, num_workers=2
     )
 
     testset = torchvision.datasets.CIFAR10(
-        root="./data", train=False, download=True, transform=transform_test
+        root=dataPath, train=False, download=True, transform=transform_test
     )
     testloader = torch.utils.data.DataLoader(
         testset, batch_size=args.batch_size, shuffle=False, num_workers=2
@@ -230,7 +231,7 @@ if __name__ == "__main__":
     try:
         context = zmq.Context()
         socket = context.socket(zmq.REQ)
-        socket.connect("tcp://172.23.33.30:800081")
+        socket.connect("tcp://172.23.33.35:800081")
         # trial get next parameter from network morphism tuner
         RCV_CONFIG = nni.get_next_parameter(socket)
         logger.info(RCV_CONFIG)
@@ -250,12 +251,15 @@ if __name__ == "__main__":
             if early_stop.step(test_acc):
                 break
         tmp_ep += 1
-        os.makedirs(os.environ["HOME"] + "/nni/experiments/" + str(nni.get_experiment_id()) + "/trials" + str(nni.get_trial_id()))
-        f = open(os.environ["HOME"] + "/nni/experiments/" + str(nni.get_experiment_id()) + "/trials/" + str(nni.get_trial_id()) + "/output.log", "w")
+        os.makedirs(os.environ["HOME"] + "/mountdir/nni/experiments/" + str(nni.get_experiment_id()) + "/trials/" + str(nni.get_trial_id()))
+        f = open(os.environ["HOME"] + "/mountdir/nni/experiments/" + str(nni.get_experiment_id()) + "/trials/" + str(nni.get_trial_id()) + "/output.log", "w")
         print("duration=" + str(time.time() - start_time))
         print("epoch=" + str(tmp_ep))
+        print("best_acc=" + str(best_acc))
+        f.write("sequence_id=" + str(nni.get_sequence_id()) + "\n")
         f.write("duration=" + str(time.time() - start_time) + "\n")
         f.write("epoch=" + str(tmp_ep) + "\n")
+        f.write("best_acc=" + str(best_acc) + "\n")
         f.close()
         # trial report best_acc to tuner
         nni.report_final_result(best_acc)
